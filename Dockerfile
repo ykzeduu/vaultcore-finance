@@ -1,7 +1,8 @@
 FROM php:8.2-apache
 
-# Instala as extensões PDO e MySQL que seu código precisa
-RUN docker-php-ext-install pdo pdo_mysql
+# Instala as extensões PDO e PostgreSQL que seu código precisa agora
+RUN apt-get update && apt-get install -y libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql
 
 # Copia todos os arquivos do seu projeto para o diretório padrão do Apache
 COPY . /var/www/html/
@@ -13,7 +14,7 @@ RUN sed -i 's/Listen 80/Listen ${PORT}/g' /etc/apache2/ports.conf \
 # Garante as permissões corretas para o Apache ler os arquivos
 RUN chown -R www-data:www-data /var/www/html
 
-# Define uma porta padrão caso queira testar localmente, o Render ignora isso e usa a dele
+# Define uma porta padrão caso queira testar localmente
 ENV PORT=80
 
 EXPOSE ${PORT}

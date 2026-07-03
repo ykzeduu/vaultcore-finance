@@ -1,15 +1,49 @@
 <?php
-// Tenta pegar as variáveis de ambiente do Render, se não existirem, usa o padrão do InfinityFree
-$host = getenv('DB_HOST') ?: "sql210.infinityfree.com";
-$user = getenv('DB_USER') ?: "if0_41175004";
-$pass = getenv('DB_PASS') ?: "UZ5E9cEop7ARX"; 
-$dbname = getenv('DB_NAME') ?: "if0_41175004_financeiro";
+// Se o Render fornecer a string completa DATABASE_URL, nós a quebramos para conectar
+$database_url = getenv('DATABASE_URL');
+
+if ($database_url) {
+    $dbopts = parse_url($database_url);
+    $host = $dbopts["host"];
+    $port = $dbopts["port"] ?? 5432;
+    $user = $dbopts["user"];
+    $pass = $dbopts["pass"];
+    $dbname = ltrim($dbopts["path"], '/');
+} else {
+    // Configurações padrão caso você rode localmente no seu computador com Postgres
+    $host = "localhost";
+    $port = 5432;
+    $user = "postgres";
+    $pass = "senha";
+    $dbname = "financeiro";
+}
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
+    // Conexão via PDO usando o driver 'pgsql'
+    $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$dbname", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // ==========================================
+    // CRIAÇÃO AUTOMÁTICA DA TABELA (MÁGICA)
+    // ==========================================
+    
+    // Script SQL adaptado para o PostgreSQL
+    $sql_criar_tabela = "
+    CREATE TABLE IF NOT EXISTS lancamentos (
+        id SERIAL PRIMARY KEY,
+        tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('entrada', 'saida')),
+        categoria VARCHAR(50) NOT NULL,
+        valor DECIMAL(10,2) NOT NULL,
+        data_lancamento DATE NOT NULL,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        conta VARCHAR(15) DEFAULT 'salario' CHECK (conta IN ('salario', 'vale', 'cartao')),
+        fatura_mes VARCHAR(7) DEFAULT NULL
+    );";
+
+    // Executa o comando. Se a tabela já existir, ele não faz nada.
+    $pdo->exec($sql_criar_tabela);
+
 } catch (PDOException $e) {
-    // Exibe o erro de forma limpa se falhar
-    die("Erro de conexão: " . $e->getMessage());
+    die("Erro na conexão ou criação do banco PostgreSQL: " . $e->getMessage());
 }
 ?>
